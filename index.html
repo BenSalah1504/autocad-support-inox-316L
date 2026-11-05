@@ -1,0 +1,1405 @@
+<!DOCTYPE html>
+<html lang="fr" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CAD 3D — Support 35000 & Buzzer (INOX 316L ép. 3,5 mm)</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    * { box-sizing: border-box; user-select: none; }
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0b0f17;
+      color: #e2e8f0;
+      overflow: hidden;
+      height: 100vh;
+      width: 100vw;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      cursor: grab;
+    }
+    canvas:active {
+      cursor: grabbing;
+    }
+    .glass-panel {
+      background: rgba(15, 23, 42, 0.86);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+    }
+    .cad-btn {
+      background: rgba(30, 41, 59, 0.85);
+      border: 1px solid rgba(148, 163, 184, 0.22);
+      color: #cbd5e1;
+      transition: all 0.15s ease;
+    }
+    .cad-btn:hover {
+      background: rgba(51, 65, 85, 0.95);
+      border-color: #38bdf8;
+      color: #ffffff;
+    }
+    .cad-btn.active {
+      background: rgba(14, 165, 233, 0.22);
+      border-color: #38bdf8;
+      color: #38bdf8;
+      font-weight: 600;
+    }
+    input[type="range"] {
+      accent-color: #38bdf8;
+    }
+    .badge-pink {
+      background: rgba(244, 63, 94, 0.2);
+      border: 1px solid rgba(244, 63, 94, 0.5);
+      color: #fda4af;
+    }
+    .badge-yellow {
+      background: rgba(234, 179, 8, 0.2);
+      border: 1px solid rgba(234, 179, 8, 0.5);
+      color: #fde047;
+    }
+  </style>
+</head>
+<body class="relative flex flex-col h-screen w-screen overflow-hidden">
+
+  <!-- Top Header / Title Bar -->
+  <header class="glass-panel z-20 flex flex-wrap items-center justify-between px-4 py-2.5 border-b border-slate-800">
+    <div class="flex items-center gap-3">
+      <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-sky-500/20 border border-sky-400/40 text-sky-400 font-bold text-sm">
+        3D
+      </div>
+      <div>
+        <div class="flex items-center gap-2">
+          <h1 class="text-sm font-bold tracking-wide text-white uppercase">
+            Support 35000 &amp; Buzzer — Tôle Pliée
+          </h1>
+          <span class="rounded px-2 py-0.5 text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+            INOX 316L
+          </span>
+          <span class="rounded px-2 py-0.5 text-xs font-semibold badge-pink">
+            ép. 3,5 mm
+          </span>
+          <span class="rounded px-2 py-0.5 text-xs font-semibold bg-sky-500/20 text-sky-300 border border-sky-500/30">
+            Qt = 60 pièces
+          </span>
+        </div>
+        <p class="text-xs text-slate-400">
+          D'après croquis technique <code class="text-slate-300">IMG_3176.jpeg</code> • Longueur 550 mm × Hauteur 200 mm + Auvent 200 mm (10°) + Retombée 20 mm
+        </p>
+      </div>
+    </div>
+
+    <!-- Camera Presets -->
+    <div class="flex flex-wrap items-center gap-1.5 mt-2 sm:mt-0">
+      <span class="text-xs text-slate-400 mr-1">Vues :</span>
+      <button onclick="setCameraPreset('iso')" id="view-iso" class="cad-btn active rounded-md px-2.5 py-1 text-xs">
+        Isométrique 3D
+      </button>
+      <button onclick="setCameraPreset('front')" id="view-front" class="cad-btn rounded-md px-2.5 py-1 text-xs" title="Vue de face (Gauche du croquis)">
+        Vue de Face (550×200)
+      </button>
+      <button onclick="setCameraPreset('right')" id="view-right" class="cad-btn rounded-md px-2.5 py-1 text-xs" title="Vue de profil (Droite du croquis)">
+        Vue de Profil (10°)
+      </button>
+      <button onclick="setCameraPreset('top')" id="view-top" class="cad-btn rounded-md px-2.5 py-1 text-xs">
+        Vue de Dessus
+      </button>
+      <button onclick="setCameraPreset('flat')" id="view-flat" class="cad-btn rounded-md px-2.5 py-1 text-xs">
+        Tôle Dépliée (Laser)
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Viewport Area -->
+  <div class="relative flex-1 w-full h-full overflow-hidden">
+    <canvas id="cadCanvas"></canvas>
+
+    <!-- Left Floating Control Panel -->
+    <aside class="glass-panel absolute top-3 left-3 z-10 w-80 max-h-[calc(100%-1.5rem)] overflow-y-auto rounded-xl p-3.5 flex flex-col gap-3.5 text-xs">
+      
+      <!-- Unfold / Bend Animation Slider -->
+      <div class="border-b border-slate-700/70 pb-3">
+        <div class="flex items-center justify-between mb-1">
+          <span class="font-semibold text-sky-300 uppercase tracking-wider">Pliage Tôle (Simulation)</span>
+          <span id="foldLabel" class="font-mono font-bold text-white bg-slate-800 px-2 py-0.5 rounded">100% (Plié)</span>
+        </div>
+        <input id="foldSlider" type="range" min="0" max="100" value="100" class="w-full cursor-pointer" oninput="onFoldChange(this.value)" />
+        <div class="flex justify-between text-slate-400 mt-1">
+          <button onclick="animateFold(0)" class="hover:text-sky-400 underline">0% Déplié (Laser)</button>
+          <button onclick="animateFold(100)" class="hover:text-sky-400 underline">100% Plié (Final)</button>
+        </div>
+      </div>
+
+      <!-- Display Options -->
+      <div class="border-b border-slate-700/70 pb-3">
+        <div class="font-semibold text-slate-200 uppercase tracking-wider mb-2">Affichage &amp; Calques</div>
+        <div class="grid grid-cols-2 gap-1.5">
+          <button id="toggle-dims" onclick="toggleOption('showDims')" class="cad-btn active rounded px-2 py-1.5 text-left flex items-center justify-between">
+            <span>Cotes (Croquis)</span>
+            <span class="w-2 h-2 rounded-full bg-sky-400"></span>
+          </button>
+          <button id="toggle-equip" onclick="toggleOption('showEquip')" class="cad-btn active rounded px-2 py-1.5 text-left flex items-center justify-between">
+            <span>35000 &amp; Buzzer</span>
+            <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+          </button>
+          <button id="toggle-axes" onclick="toggleOption('showCenterlines')" class="cad-btn active rounded px-2 py-1.5 text-left flex items-center justify-between">
+            <span>Axes (- · -)</span>
+            <span class="w-2 h-2 rounded-full bg-rose-400"></span>
+          </button>
+          <button id="toggle-wire" onclick="toggleOption('wireframe')" class="cad-btn rounded px-2 py-1.5 text-left flex items-center justify-between">
+            <span>Mode Filaire</span>
+            <span class="w-2 h-2 rounded-full bg-slate-400"></span>
+          </button>
+          <button id="toggle-ortho" onclick="toggleOption('ortho')" class="cad-btn rounded px-2 py-1.5 text-left flex items-center justify-between">
+            <span>Projection Ortho</span>
+            <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+          </button>
+          <button id="toggle-xray" onclick="toggleOption('xray')" class="cad-btn rounded px-2 py-1.5 text-left flex items-center justify-between">
+            <span>Transparence</span>
+            <span class="w-2 h-2 rounded-full bg-purple-400"></span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Specifications Table from Sketch -->
+      <div class="border-b border-slate-700/70 pb-3">
+        <div class="font-semibold text-slate-200 uppercase tracking-wider mb-2">Cotes du Croquis (mm)</div>
+        <div class="space-y-1.5 text-xs">
+          <div class="flex justify-between items-center bg-slate-900/70 px-2.5 py-1 rounded border border-slate-800">
+            <span class="text-slate-400">Face principale (L × H)</span>
+            <span class="font-mono font-semibold badge-pink px-1.5 rounded">550 × 200 mm</span>
+          </div>
+          <div class="flex justify-between items-center bg-slate-900/70 px-2.5 py-1 rounded border border-slate-800">
+            <span class="text-slate-400">Épaisseur matière</span>
+            <span class="font-mono font-semibold badge-pink px-1.5 rounded">ép. 3,5 mm</span>
+          </div>
+          <div class="flex justify-between items-center bg-slate-900/70 px-2.5 py-1 rounded border border-slate-800">
+            <span class="text-slate-400">Auvent supérieur (pente)</span>
+            <span class="font-mono font-semibold badge-pink px-1.5 rounded">200 mm à 10°</span>
+          </div>
+          <div class="flex justify-between items-center bg-slate-900/70 px-2.5 py-1 rounded border border-slate-800">
+            <span class="text-slate-400">Retombée avant (pli)</span>
+            <span class="font-mono font-semibold badge-pink px-1.5 rounded">20 mm</span>
+          </div>
+          <div class="flex justify-between items-center bg-slate-900/70 px-2.5 py-1 rounded border border-slate-800">
+            <span class="text-slate-400">Perçages 35000 (gauche)</span>
+            <span class="font-mono font-semibold badge-yellow px-1.5 rounded">2× Ø8 (entr. 136)</span>
+          </div>
+          <div class="flex justify-between items-center bg-slate-900/70 px-2.5 py-1 rounded border border-slate-800">
+            <span class="text-slate-400">Position axe 35000</span>
+            <span class="font-mono font-semibold badge-yellow px-1.5 rounded">100 mm du bord G</span>
+          </div>
+          <div class="flex justify-between items-center bg-slate-900/70 px-2.5 py-1 rounded border border-slate-800">
+            <span class="text-slate-400">Perçages BUZZER (droite)</span>
+            <span class="font-mono font-semibold badge-yellow px-1.5 rounded">2× Ø7 (entr. 100)</span>
+          </div>
+          <div class="flex justify-between items-center bg-slate-900/70 px-2.5 py-1 rounded border border-slate-800">
+            <span class="text-slate-400">Position axe BUZZER</span>
+            <span class="font-mono font-semibold badge-yellow px-1.5 rounded">100 mm du bord D</span>
+          </div>
+          <div class="flex justify-between items-center bg-slate-900/70 px-2.5 py-1 rounded border border-slate-800">
+            <span class="text-slate-400">Développé à plat (K=0.44)</span>
+            <span id="devSizeLabel" class="font-mono font-semibold text-emerald-300">550 × 412,8 mm</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Parametric Fine-Tuning -->
+      <div class="border-b border-slate-700/70 pb-3">
+        <div class="font-semibold text-slate-200 uppercase tracking-wider mb-2">Ajustement Paramétrique</div>
+        <div class="space-y-2">
+          <div>
+            <div class="flex justify-between text-slate-400 mb-0.5">
+              <span>Angle pente auvent (10°)</span>
+              <span id="val-angle" class="font-mono text-sky-300">10°</span>
+            </div>
+            <input type="range" min="0" max="30" step="1" value="10" class="w-full" oninput="updateParam('slopeDeg', this.value)" />
+          </div>
+          <div>
+            <div class="flex justify-between text-slate-400 mb-0.5">
+              <span>Hauteur perçages 2×Ø7 ( / bas)</span>
+              <span id="val-y7" class="font-mono text-sky-300">40 mm</span>
+            </div>
+            <input type="range" min="25" max="65" step="1" value="40" class="w-full" oninput="updateParam('hole7Y', this.value)" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Direct DXF Export Button -->
+      <div>
+        <button onclick="downloadDXF()" class="w-full py-2 px-3 rounded-lg bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white font-semibold shadow-lg shadow-sky-500/20 flex items-center justify-center gap-2 transition">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4" />
+          </svg>
+          <span>Télécharger .DXF (AutoCAD 2024)</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Bottom Right Help / Navigation Legend -->
+    <div class="glass-panel absolute bottom-3 right-3 z-10 rounded-lg px-3.5 py-2 text-xs text-slate-300 flex items-center gap-4">
+      <span><strong class="text-sky-400">Clic Gauche :</strong> Orbite 3D</span>
+      <span><strong class="text-sky-400">Clic Droit / Shift :</strong> Panoramique</span>
+      <span><strong class="text-sky-400">Molette :</strong> Zoom</span>
+    </div>
+  </div>
+
+  <script>
+    // =========================================================================
+    // CAD GEOMETRY PARAMETERS (Exact match to IMG_3176.jpeg)
+    // =========================================================================
+    const params = {
+      width: 550,          // 550 mm total length
+      webHeight: 200,      // 200 mm vertical backplate height
+      roofLen: 200,        // 200 mm sloped hood length
+      lipLen: 20,          // 20 mm front vertical return lip
+      thickness: 3.5,      // ép 3,5 mm INOX 316L
+      slopeDeg: 10,        // ~10° downward slope from horizontal
+      // Left holes (BS2000): 2x Ø8, center-to-center 136 mm, ~100 mm from left
+      hole8X: 100,
+      hole8Spacing: 136,
+      hole8Dia: 8,
+      // Right holes (BUZZER): 2x Ø7, center-to-center ~100 mm, axis ~100 mm from right (X = 450)
+      buzzerAxisX: 450,    // 550 - 100
+      hole7Spacing: 100,
+      hole7Dia: 7,
+      hole7Y: 40,          // 40 mm from bottom edge (-60 mm from centerline)
+      // Animation & Display state
+      foldProgress: 1.0,   // 0.0 = flat laser sheet, 1.0 = fully bent 3D part
+      showDims: true,
+      showEquip: true,
+      showCenterlines: true,
+      wireframe: false,
+      ortho: false,
+      xray: false
+    };
+
+    // Camera state
+    const camera = {
+      yaw: -0.62,
+      pitch: 0.42,
+      distance: 920,
+      target: { x: 275, y: 100, z: 75 }
+    };
+
+    const canvas = document.getElementById('cadCanvas');
+    const ctx = canvas.getContext('2d');
+    let isDragging = false;
+    let dragMode = 'orbit'; // 'orbit' | 'pan'
+    let lastMouse = { x: 0, y: 0 };
+    let animFrameId = null;
+
+    function resizeCanvas() {
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.parentElement.getBoundingClientRect();
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      render();
+    }
+    window.addEventListener('resize', resizeCanvas);
+
+    // =========================================================================
+    // 3D MATH & PROJECTION ENGINE
+    // =========================================================================
+    function getCameraBasis() {
+      const cy = Math.cos(camera.yaw), sy = Math.sin(camera.yaw);
+      const cp = Math.cos(camera.pitch), sp = Math.sin(camera.pitch);
+      // Forward vector pointing from camera to target
+      const fx = -sy * cp;
+      const fy = -sp;
+      const fz = -cy * cp;
+      // Right vector
+      const rx = cy;
+      const ry = 0;
+      const rz = -sy;
+      // Up vector = R x F
+      const ux = ry * fz - rz * fy;
+      const uy = rz * fx - rx * fz;
+      const uz = rx * fy - ry * fx;
+
+      const camPos = {
+        x: camera.target.x - fx * camera.distance,
+        y: camera.target.y - fy * camera.distance,
+        z: camera.target.z - fz * camera.distance
+      };
+      return { fx, fy, fz, rx, ry, rz, ux, uy, uz, camPos };
+    }
+
+    function project3D(pt, basis, width, height) {
+      const dx = pt.x - camera.target.x;
+      const dy = pt.y - camera.target.y;
+      const dz = pt.z - camera.target.z;
+
+      const vx = dx * basis.rx + dy * basis.ry + dz * basis.rz;
+      const vy = dx * basis.ux + dy * basis.uy + dz * basis.uz;
+      const vz = dx * basis.fx + dy * basis.fy + dz * basis.fz;
+
+      const fovScale = Math.min(width, height) * 0.95;
+      if (params.ortho) {
+        const s = fovScale / camera.distance;
+        return {
+          x: width * 0.5 + vx * s,
+          y: height * 0.5 - vy * s,
+          depth: vz + camera.distance,
+          scale: s
+        };
+      } else {
+        const dist = camera.distance + vz;
+        if (dist < 10) return null;
+        const s = fovScale / dist;
+        return {
+          x: width * 0.5 + vx * s,
+          y: height * 0.5 - vy * s,
+          depth: dist,
+          scale: s
+        };
+      }
+    }
+
+    function vecSub(a, b) { return { x: a.x - b.x, y: a.y - b.y, z: a.z - b.z }; }
+    function vecCross(a, b) {
+      return {
+        x: a.y * b.z - a.z * b.y,
+        y: a.z * b.x - a.x * b.z,
+        z: a.x * b.y - a.y * b.x
+      };
+    }
+    function vecNorm(v) {
+      const len = Math.hypot(v.x, v.y, v.z) || 1;
+      return { x: v.x / len, y: v.y / len, z: v.z / len };
+    }
+    function vecDot(a, b) { return a.x * b.x + a.y * b.y + a.z * b.z; }
+
+    // =========================================================================
+    // SHEET METAL PROFILE KINEMATICS (Supporting 0% Unfolded -> 100% Bent)
+    // =========================================================================
+    // Coordinate System:
+    // X: [0 .. 550] left to right
+    // Y: [0 .. 200] bottom to top of vertical backplate
+    // Z: [0 = back face of vertical plate, +3.5 = front face, +Z = forward toward hood]
+    function getProfilePoints() {
+      const t = params.thickness;
+      const f = params.foldProgress;
+      const H = params.webHeight;
+      const L2 = params.roofLen;
+      const L3 = params.lipLen;
+      const slopeRad = (params.slopeDeg * Math.PI) / 180;
+
+      // Bend 1 angle from straight upward (+Y):
+      // When flat (f=0): roof continues straight along +Y (bend1 = 0)
+      // When bent (f=1): roof slopes forward (+Z) and downward (-Y) by slopeDeg from horizontal (+Z)
+      // Angle from +Y axis toward +Z axis is (90° + slopeDeg)
+      const bend1 = f * (Math.PI / 2 + slopeRad);
+
+      // Direction of roof segment (unit vector in YZ plane)
+      const dir2Y = Math.cos(bend1);
+      const dir2Z = Math.sin(bend1);
+      // Normal to roof segment pointing "outward/upward" (away from inside of bend)
+      // For web (along +Y, dir=(0,1)), outward normal is (0, 0, -1) (back) and inward is (0, 0, +1) (front)
+      // Let's trace the INSIDE face (front face of web, z = t) and OUTSIDE face (back face of web, z = 0)
+
+      // Bend 2 angle: at the end of roof, lip bends downward to become vertical (-Y) when f=1
+      // Relative bend angle from roof direction to vertical downward (-Y, angle = PI from +Y):
+      const bend2Rel = f * (Math.PI - (Math.PI / 2 + slopeRad));
+      const totalAngle3 = bend1 + bend2Rel;
+      const dir3Y = Math.cos(totalAngle3);
+      const dir3Z = Math.sin(totalAngle3);
+
+      // Centerline / neutral axis points in (Y, Z):
+      const p0 = { y: 0, z: t / 2 };
+      const p1 = { y: H, z: t / 2 };
+      const p2 = {
+        y: p1.y + L2 * dir2Y,
+        z: p1.z + L2 * dir2Z
+      };
+      const p3 = {
+        y: p2.y + L3 * dir3Y,
+        z: p2.z + L3 * dir3Z
+      };
+
+      // Normals for each segment (pointing toward +Z when vertical along +Y)
+      const n1 = { y: 0, z: 1 };
+      const n2 = { y: -dir2Z, z: dir2Y };
+      const n3 = { y: -dir3Z, z: dir3Y };
+
+      // Helper to offset a point by d along normal n
+      function off(p, n, d) {
+        return { y: p.y + n.y * d, z: p.z + n.z * d };
+      }
+      // Helper to intersect two offset lines in YZ plane
+      function intersectLines(pA, dirA, pB, dirB) {
+        const det = dirA.y * (-dirB.z) - dirA.z * (-dirB.y);
+        if (Math.abs(det) < 1e-5) {
+          return { y: (pA.y + pB.y) * 0.5, z: (pA.z + pB.z) * 0.5 };
+        }
+        const dy = pB.y - pA.y;
+        const dz = pB.z - pA.z;
+        const s = (dy * (-dirB.z) - dz * (-dirB.y)) / det;
+        return { y: pA.y + s * dirA.y, z: pA.z + s * dirA.z };
+      }
+
+      const d1 = { y: 1, z: 0 };
+      const d2 = { y: dir2Y, z: dir2Z };
+      const d3 = { y: dir3Y, z: dir3Z };
+
+      // Outer skin (z = 0 on web, i.e. offset -t/2)
+      const out0 = off(p0, n1, -t / 2);
+      const out1 = intersectLines(off(p1, n1, -t / 2), d1, off(p1, n2, -t / 2), d2);
+      const out2 = intersectLines(off(p2, n2, -t / 2), d2, off(p2, n3, -t / 2), d3);
+      const out3 = off(p3, n3, -t / 2);
+
+      // Inner skin (z = +t on web, i.e. offset +t/2)
+      const in0 = off(p0, n1, +t / 2);
+      const in1 = intersectLines(off(p1, n1, +t / 2), d1, off(p1, n2, +t / 2), d2);
+      const in2 = intersectLines(off(p2, n2, +t / 2), d2, off(p2, n3, +t / 2), d3);
+      const in3 = off(p3, n3, +t / 2);
+
+      return { out0, out1, out2, out3, in0, in1, in2, in3, p0, p1, p2, p3 };
+    }
+
+    // =========================================================================
+    // BUILD 3D MESHES (Sheet Metal with Holes + Optional BS2000 & Buzzer)
+    // =========================================================================
+    function buildSceneGeometry() {
+      const faces = [];
+      const lines = [];
+      const W = params.width;
+      const prof = getProfilePoints();
+
+      // 1. Web Plate (with 4 through-holes: 2x Ø8 on left, 2x Ø7 on right)
+      // We render the front & back faces of the web, plus the 3D hole barrels!
+      const metalFrontColor = { r: 196, g: 206, b: 218 };
+      const metalBackColor = { r: 168, g: 179, b: 192 };
+      const metalEdgeColor = { r: 130, g: 145, b: 162 };
+
+      // Web corners
+      const wOut0L = { x: 0, y: prof.out0.y, z: prof.out0.z };
+      const wOut0R = { x: W, y: prof.out0.y, z: prof.out0.z };
+      const wOut1L = { x: 0, y: prof.out1.y, z: prof.out1.z };
+      const wOut1R = { x: W, y: prof.out1.y, z: prof.out1.z };
+
+      const wIn0L = { x: 0, y: prof.in0.y, z: prof.in0.z };
+      const wIn0R = { x: W, y: prof.in0.y, z: prof.in0.z };
+      const wIn1L = { x: 0, y: prof.in1.y, z: prof.in1.z };
+      const wIn1R = { x: W, y: prof.in1.y, z: prof.in1.z };
+
+      // Subdivide web horizontally into strips around X to improve painter's depth sorting
+      const xSplits = [0, 60, 140, 275, 375, 450, 550];
+      for (let i = 0; i < xSplits.length - 1; i++) {
+        const xA = xSplits[i], xB = xSplits[i + 1];
+        // Back face strip
+        faces.push({
+          pts: [
+            { x: xA, y: prof.out0.y, z: prof.out0.z },
+            { x: xA, y: prof.out1.y, z: prof.out1.z },
+            { x: xB, y: prof.out1.y, z: prof.out1.z },
+            { x: xB, y: prof.out0.y, z: prof.out0.z }
+          ],
+          color: metalBackColor,
+          tag: 'sheet'
+        });
+        // Front face strip
+        faces.push({
+          pts: [
+            { x: xA, y: prof.in0.y, z: prof.in0.z },
+            { x: xB, y: prof.in0.y, z: prof.in0.z },
+            { x: xB, y: prof.in1.y, z: prof.in1.z },
+            { x: xA, y: prof.in1.y, z: prof.in1.z }
+          ],
+          color: metalFrontColor,
+          tag: 'sheet'
+        });
+        // Roof segment strips
+        faces.push({
+          pts: [
+            { x: xA, y: prof.out1.y, z: prof.out1.z },
+            { x: xA, y: prof.out2.y, z: prof.out2.z },
+            { x: xB, y: prof.out2.y, z: prof.out2.z },
+            { x: xB, y: prof.out1.y, z: prof.out1.z }
+          ],
+          color: metalFrontColor,
+          tag: 'sheet'
+        });
+        faces.push({
+          pts: [
+            { x: xA, y: prof.in1.y, z: prof.in1.z },
+            { x: xB, y: prof.in1.y, z: prof.in1.z },
+            { x: xB, y: prof.in2.y, z: prof.in2.z },
+            { x: xA, y: prof.in2.y, z: prof.in2.z }
+          ],
+          color: metalBackColor,
+          tag: 'sheet'
+        });
+        // Lip segment strips
+        faces.push({
+          pts: [
+            { x: xA, y: prof.out2.y, z: prof.out2.z },
+            { x: xA, y: prof.out3.y, z: prof.out3.z },
+            { x: xB, y: prof.out3.y, z: prof.out3.z },
+            { x: xB, y: prof.out2.y, z: prof.out2.z }
+          ],
+          color: metalFrontColor,
+          tag: 'sheet'
+        });
+        faces.push({
+          pts: [
+            { x: xA, y: prof.in2.y, z: prof.in2.z },
+            { x: xB, y: prof.in2.y, z: prof.in2.z },
+            { x: xB, y: prof.in3.y, z: prof.in3.z },
+            { x: xA, y: prof.in3.y, z: prof.in3.z }
+          ],
+          color: metalBackColor,
+          tag: 'sheet'
+        });
+      }
+
+      // Thickness side caps (Left X=0, Right X=W, Bottom edge, Lip tip edge)
+      const segPairs = [
+        [prof.out0, prof.out1, prof.in1, prof.in0],
+        [prof.out1, prof.out2, prof.in2, prof.in1],
+        [prof.out2, prof.out3, prof.in3, prof.in2]
+      ];
+      segPairs.forEach(([oA, oB, iB, iA]) => {
+        // Left thickness cap (X = 0)
+        faces.push({
+          pts: [
+            { x: 0, y: oA.y, z: oA.z },
+            { x: 0, y: iA.y, z: iA.z },
+            { x: 0, y: iB.y, z: iB.z },
+            { x: 0, y: oB.y, z: oB.z }
+          ],
+          color: metalEdgeColor,
+          tag: 'sheet-edge',
+          outline: true
+        });
+        // Right thickness cap (X = W)
+        faces.push({
+          pts: [
+            { x: W, y: oA.y, z: oA.z },
+            { x: W, y: oB.y, z: oB.z },
+            { x: W, y: iB.y, z: iB.z },
+            { x: W, y: iA.y, z: iA.z }
+          ],
+          color: metalEdgeColor,
+          tag: 'sheet-edge',
+          outline: true
+        });
+      });
+
+      // Bottom edge cap & Lip tip cap
+      faces.push({
+        pts: [wOut0L, wOut0R, wIn0R, wIn0L],
+        color: metalEdgeColor,
+        tag: 'sheet-edge',
+        outline: true
+      });
+      faces.push({
+        pts: [
+          { x: 0, y: prof.out3.y, z: prof.out3.z },
+          { x: 0, y: prof.in3.y, z: prof.in3.z },
+          { x: W, y: prof.in3.y, z: prof.in3.z },
+          { x: W, y: prof.out3.y, z: prof.out3.z }
+        ],
+        color: metalEdgeColor,
+        tag: 'sheet-edge',
+        outline: true
+      });
+
+      // Sharp CAD Boundary Edges for the Sheet Metal
+      const cadEdgeNodes = [
+        [prof.out0, prof.out1], [prof.out1, prof.out2], [prof.out2, prof.out3],
+        [prof.in0, prof.in1], [prof.in1, prof.in2], [prof.in2, prof.in3]
+      ];
+      cadEdgeNodes.forEach(([a, b]) => {
+        lines.push({ a: { x: 0, y: a.y, z: a.z }, b: { x: 0, y: b.y, z: b.z }, color: '#475569', width: 1.4 });
+        lines.push({ a: { x: W, y: a.y, z: a.z }, b: { x: W, y: b.y, z: b.z }, color: '#475569', width: 1.4 });
+      });
+      [prof.out0, prof.out1, prof.out2, prof.out3, prof.in0, prof.in1, prof.in2, prof.in3].forEach(p => {
+        lines.push({ a: { x: 0, y: p.y, z: p.z }, b: { x: W, y: p.y, z: p.z }, color: '#475569', width: 1.3 });
+      });
+
+      // 2. Four Through-Holes (2x Ø8 on Left, 2x Ø7 on Right)
+      const holes = [
+        { x: params.hole8X, y: 100 + params.hole8Spacing / 2, r: params.hole8Dia / 2, label: 'Ø8' },
+        { x: params.hole8X, y: 100 - params.hole8Spacing / 2, r: params.hole8Dia / 2, label: 'Ø8' },
+        { x: params.buzzerAxisX - params.hole7Spacing / 2, y: params.hole7Y, r: params.hole7Dia / 2, label: 'Ø7' },
+        { x: params.buzzerAxisX + params.hole7Spacing / 2, y: params.hole7Y, r: params.hole7Dia / 2, label: 'Ø7' }
+      ];
+
+      const holeSegs = 16;
+      holes.forEach(h => {
+        const ringFront = [];
+        const ringBack = [];
+        for (let i = 0; i < holeSegs; i++) {
+          const ang = (i / holeSegs) * Math.PI * 2;
+          const hx = h.x + Math.cos(ang) * h.r;
+          const hy = h.y + Math.sin(ang) * h.r;
+          ringBack.push({ x: hx, y: hy, z: -0.08 });
+          ringFront.push({ x: hx, y: hy, z: params.thickness + 0.08 });
+        }
+        // Dark interior hole cap so holes clearly read as through-holes on solid plate
+        faces.push({
+          pts: ringFront.slice(),
+          color: { r: 15, g: 23, b: 42 },
+          unlit: true,
+          tag: 'hole'
+        });
+        faces.push({
+          pts: ringBack.slice().reverse(),
+          color: { r: 15, g: 23, b: 42 },
+          unlit: true,
+          tag: 'hole'
+        });
+        // Hole perimeter highlight rings (yellow-gold CAD callout)
+        for (let i = 0; i < holeSegs; i++) {
+          const j = (i + 1) % holeSegs;
+          lines.push({ a: ringFront[i], b: ringFront[j], color: '#facc15', width: 1.8 });
+          lines.push({ a: ringBack[i], b: ringBack[j], color: '#eab308', width: 1.4 });
+        }
+      });
+
+      // 3. Reference Mounted Equipment: BS2000 & BUZZER (when enabled)
+      if (params.showEquip) {
+        const zMount = params.thickness + 0.3;
+
+        // --- BS2000 Device (centered at X=100, Y=100, radius=60 mm) ---
+        const bsR = 60;
+        const bsDepth = 28;
+        const bsSegs = 24;
+        const bsFront = [], bsBack = [];
+        for (let i = 0; i < bsSegs; i++) {
+          const a = (i / bsSegs) * Math.PI * 2;
+          const px = params.hole8X + Math.cos(a) * bsR;
+          const py = 100 + Math.sin(a) * bsR;
+          bsBack.push({ x: px, y: py, z: zMount });
+          bsFront.push({ x: px, y: py, z: zMount + bsDepth });
+        }
+        for (let i = 0; i < bsSegs; i++) {
+          const j = (i + 1) % bsSegs;
+          faces.push({
+            pts: [bsBack[i], bsBack[j], bsFront[j], bsFront[i]],
+            color: { r: 56, g: 189, b: 248 },
+            alpha: 0.35,
+            tag: 'equip'
+          });
+          lines.push({ a: bsFront[i], b: bsFront[j], color: '#38bdf8', width: 1.5 });
+          lines.push({ a: bsBack[i], b: bsBack[j], color: '#0284c7', width: 1.1 });
+        }
+        faces.push({
+          pts: bsFront,
+          color: { r: 14, g: 165, b: 233 },
+          alpha: 0.32,
+          tag: 'equip'
+        });
+
+        // BS2000 Mounting Ears (Top, Bottom, Left) + Horizontal Duct (Y=70..130, X=152..360)
+        const addBoxWireAndGhost = (x0, x1, y0, y1, z0, z1, colFill, colLine) => {
+          const p000 = { x: x0, y: y0, z: z0 }, p100 = { x: x1, y: y0, z: z0 };
+          const p110 = { x: x1, y: y1, z: z0 }, p010 = { x: x0, y: y1, z: z0 };
+          const p001 = { x: x0, y: y0, z: z1 }, p101 = { x: x1, y: y0, z: z1 };
+          const p111 = { x: x1, y: y1, z: z1 }, p011 = { x: x0, y: y1, z: z1 };
+          const boxFaces = [
+            [p001, p101, p111, p011],
+            [p000, p100, p101, p001],
+            [p100, p110, p111, p101],
+            [p110, p010, p011, p111],
+            [p010, p000, p001, p011]
+          ];
+          boxFaces.forEach(pts => {
+            faces.push({ pts, color: colFill, alpha: 0.30, tag: 'equip' });
+          });
+          const edges = [
+            [p000, p100], [p100, p110], [p110, p010], [p010, p000],
+            [p001, p101], [p101, p111], [p111, p011], [p011, p001],
+            [p000, p001], [p100, p101], [p110, p111], [p010, p011]
+          ];
+          edges.forEach(([a, b]) => lines.push({ a, b, color: colLine, width: 1.3 }));
+        };
+
+        // Top & Bottom mounting ears for 2x Ø8
+        addBoxWireAndGhost(params.hole8X - 14, params.hole8X + 14, 158, 176, zMount, zMount + 6, { r: 56, g: 189, b: 248 }, '#38bdf8');
+        addBoxWireAndGhost(params.hole8X - 14, params.hole8X + 14, 24, 42, zMount, zMount + 6, { r: 56, g: 189, b: 248 }, '#38bdf8');
+        // Left tab
+        addBoxWireAndGhost(params.hole8X - 76, params.hole8X - 58, 88, 112, zMount, zMount + 10, { r: 56, g: 189, b: 248 }, '#38bdf8');
+        // Horizontal rectangular arm/channel from BS2000 toward Buzzer
+        addBoxWireAndGhost(params.hole8X + 52, 360, 70, 130, zMount, zMount + 16, { r: 56, g: 189, b: 248 }, '#38bdf8');
+
+        // --- BUZZER Housing (130 x 130 mm square, depth 120 mm as shown in Side View) ---
+        const bzHalf = 65;
+        const bzDepth = 120;
+        addBoxWireAndGhost(
+          params.buzzerAxisX - bzHalf,
+          params.buzzerAxisX + bzHalf,
+          100 - bzHalf,
+          100 + bzHalf,
+          zMount,
+          zMount + bzDepth,
+          { r: 245, g: 158, b: 11 },
+          '#fbbf24'
+        );
+        // Dashed / circular horn outline on Buzzer (Ø120 outer, Ø80 inner)
+        const hornSegs = 24;
+        for (let i = 0; i < hornSegs; i++) {
+          const j = (i + 1) % hornSegs;
+          const a1 = (i / hornSegs) * Math.PI * 2;
+          const a2 = (j / hornSegs) * Math.PI * 2;
+          // Front circle on buzzer face
+          lines.push({
+            a: { x: params.buzzerAxisX + Math.cos(a1) * 58, y: 100 + Math.sin(a1) * 58, z: zMount + bzDepth },
+            b: { x: params.buzzerAxisX + Math.cos(a2) * 58, y: 100 + Math.sin(a2) * 58, z: zMount + bzDepth },
+            color: '#fcd34d',
+            width: 1.2,
+            dashed: true
+          });
+          // Side view dashed circle (in YZ plane at X = buzzerAxisX + bzHalf)
+          lines.push({
+            a: { x: params.buzzerAxisX + bzHalf, y: 100 + Math.sin(a1) * 38, z: zMount + bzDepth * 0.5 + Math.cos(a1) * 38 },
+            b: { x: params.buzzerAxisX + bzHalf, y: 100 + Math.sin(a2) * 38, z: zMount + bzDepth * 0.5 + Math.cos(a2) * 38 },
+            color: '#fcd34d',
+            width: 1.2,
+            dashed: true
+          });
+        }
+      }
+
+      // 4. Centerlines (- . - . -)
+      if (params.showCenterlines) {
+        const zCL = params.thickness + 0.5;
+        // Main horizontal centerline Y = 100
+        lines.push({
+          a: { x: -25, y: 100, z: zCL },
+          b: { x: W + 25, y: 100, z: zCL },
+          color: '#f43f5e',
+          width: 1.2,
+          centerline: true
+        });
+        // Left vertical centerline X = 100 (BS2000)
+        lines.push({
+          a: { x: params.hole8X, y: -20, z: zCL },
+          b: { x: params.hole8X, y: 220, z: zCL },
+          color: '#f43f5e',
+          width: 1.2,
+          centerline: true
+        });
+        // Right vertical centerline X = 450 (BUZZER)
+        lines.push({
+          a: { x: params.buzzerAxisX, y: -20, z: zCL },
+          b: { x: params.buzzerAxisX, y: 220, z: zCL },
+          color: '#f43f5e',
+          width: 1.2,
+          centerline: true
+        });
+      }
+
+      return { faces, lines, prof, holes };
+    }
+
+    // =========================================================================
+    // RENDER PIPELINE
+    // =========================================================================
+    function render() {
+      const rect = canvas.parentElement.getBoundingClientRect();
+      const width = rect.width;
+      const height = rect.height;
+
+      // Clear background with subtle engineering grid
+      ctx.fillStyle = '#0b0f17';
+      ctx.fillRect(0, 0, width, height);
+
+      drawBackgroundGrid(width, height);
+
+      const basis = getCameraBasis();
+      const scene = buildSceneGeometry();
+
+      // Light direction (headlight + top-right sun light)
+      const lightDir = vecNorm({ x: 0.35, y: 0.65, z: 0.68 });
+
+      // Project & sort faces (Painter's algorithm)
+      const projectedFaces = [];
+      for (const f of scene.faces) {
+        const pts2d = [];
+        let sumX = 0, sumY = 0, sumZ = 0;
+        let valid = true;
+        for (const p of f.pts) {
+          const pr = project3D(p, basis, width, height);
+          if (!pr) { valid = false; break; }
+          pts2d.push(pr);
+          sumX += p.x; sumY += p.y; sumZ += p.z;
+        }
+        if (!valid) continue;
+
+        const n = f.pts.length;
+        const centroid = { x: sumX / n, y: sumY / n, z: sumZ / n };
+        const distSq =
+          Math.pow(centroid.x - basis.camPos.x, 2) +
+          Math.pow(centroid.y - basis.camPos.y, 2) +
+          Math.pow(centroid.z - basis.camPos.z, 2);
+
+        // Compute face normal for shading
+        const v1 = vecSub(f.pts[1], f.pts[0]);
+        const v2 = vecSub(f.pts[2], f.pts[0]);
+        let norm = vecNorm(vecCross(v1, v2));
+        // Ensure double-sided lighting consistency
+        const viewVec = vecNorm(vecSub(basis.camPos, centroid));
+        if (vecDot(norm, viewVec) < 0) {
+          norm = { x: -norm.x, y: -norm.y, z: -norm.z };
+        }
+        const diffuse = Math.max(0, vecDot(norm, lightDir));
+        const spec = Math.pow(Math.max(0, vecDot(norm, vecNorm({
+          x: lightDir.x + viewVec.x,
+          y: lightDir.y + viewVec.y,
+          z: lightDir.z + viewVec.z
+        }))), 24);
+
+        projectedFaces.push({
+          f,
+          pts2d,
+          distSq,
+          diffuse,
+          spec
+        });
+      }
+
+      // Sort back-to-front
+      projectedFaces.sort((a, b) => b.distSq - a.distSq);
+
+      // Draw faces
+      if (!params.wireframe) {
+        for (const pf of projectedFaces) {
+          const { f, pts2d, diffuse, spec } = pf;
+          ctx.beginPath();
+          ctx.moveTo(pts2d[0].x, pts2d[0].y);
+          for (let i = 1; i < pts2d.length; i++) {
+            ctx.lineTo(pts2d[i].x, pts2d[i].y);
+          }
+          ctx.closePath();
+
+          let alpha = f.alpha !== undefined ? f.alpha : (params.xray ? 0.45 : 1.0);
+          if (f.unlit) {
+            ctx.fillStyle = `rgba(${f.color.r}, ${f.color.g}, ${f.color.b}, 1)`;
+          } else {
+            const shade = 0.52 + 0.48 * diffuse;
+            const r = Math.min(255, Math.round(f.color.r * shade + spec * 38));
+            const g = Math.min(255, Math.round(f.color.g * shade + spec * 42));
+            const b = Math.min(255, Math.round(f.color.b * shade + spec * 48));
+            ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
+          }
+          ctx.fill();
+
+          if (f.outline) {
+            ctx.strokeStyle = 'rgba(71, 85, 105, 0.65)';
+            ctx.lineWidth = 0.9;
+            ctx.stroke();
+          }
+        }
+      }
+
+      // Draw 3D CAD lines
+      for (const ln of scene.lines) {
+        const pA = project3D(ln.a, basis, width, height);
+        const pB = project3D(ln.b, basis, width, height);
+        if (!pA || !pB) continue;
+
+        ctx.save();
+        ctx.beginPath();
+        if (ln.centerline) {
+          ctx.setLineDash([10, 4, 2, 4]);
+        } else if (ln.dashed) {
+          ctx.setLineDash([5, 4]);
+        }
+        ctx.strokeStyle = ln.color;
+        ctx.lineWidth = ln.width || 1.2;
+        ctx.moveTo(pA.x, pA.y);
+        ctx.lineTo(pB.x, pB.y);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // Draw 3D Dimension Callouts & Annotations
+      if (params.showDims) {
+        draw3DDimensions(basis, width, height, scene.prof);
+      }
+
+      // Draw Orientation Gizmo in Top-Right corner
+      drawAxesGizmo(basis, width - 58, 58);
+    }
+
+    function drawBackgroundGrid(width, height) {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(30, 41, 59, 0.55)';
+      ctx.lineWidth = 1;
+      const step = 36;
+      for (let x = 0; x < width; x += step) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, height);
+        ctx.stroke();
+      }
+      for (let y = 0; y < height; y += step) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(width, y);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    // =========================================================================
+    // 3D CAD DIMENSIONS OVERLAY (Matching IMG_3176.jpeg highlights)
+    // =========================================================================
+    function drawDimLine3D(basis, w, h, p1, p2, ext1, ext2, label, theme) {
+      const s1 = project3D(p1, basis, w, h);
+      const s2 = project3D(p2, basis, w, h);
+      const e1 = project3D(ext1, basis, w, h);
+      const e2 = project3D(ext2, basis, w, h);
+      if (!s1 || !s2 || !e1 || !e2) return;
+
+      const color = theme === 'pink' ? '#fb7185' : (theme === 'yellow' ? '#facc15' : '#38bdf8');
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.3;
+
+      // Witness lines
+      ctx.beginPath();
+      ctx.moveTo(e1.x, e1.y);
+      ctx.lineTo(s1.x, s1.y);
+      ctx.moveTo(e2.x, e2.y);
+      ctx.lineTo(s2.x, s2.y);
+      // Main dimension line
+      ctx.moveTo(s1.x, s1.y);
+      ctx.lineTo(s2.x, s2.y);
+      ctx.stroke();
+
+      // Architectural / ISO oblique tick marks at s1 & s2
+      const tickSize = 4.5;
+      [s1, s2].forEach(pt => {
+        ctx.beginPath();
+        ctx.moveTo(pt.x - tickSize, pt.y + tickSize);
+        ctx.lineTo(pt.x + tickSize, pt.y - tickSize);
+        ctx.stroke();
+      });
+
+      // Badge label at midpoint
+      const mx = (s1.x + s2.x) * 0.5;
+      const my = (s1.y + s2.y) * 0.5;
+      drawLabelBadge(mx, my, label, theme);
+      ctx.restore();
+    }
+
+    function drawLabelBadge(x, y, text, theme) {
+      ctx.save();
+      ctx.font = 'bold 12px Inter, system-ui, sans-serif';
+      const padX = 6;
+      const tw = ctx.measureText(text).width;
+      const bw = tw + padX * 2;
+      const bh = 20;
+
+      if (theme === 'pink') {
+        ctx.fillStyle = 'rgba(136, 19, 55, 0.92)';
+        ctx.strokeStyle = '#fb7185';
+      } else if (theme === 'yellow') {
+        ctx.fillStyle = 'rgba(113, 63, 18, 0.92)';
+        ctx.strokeStyle = '#facc15';
+      } else {
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
+        ctx.strokeStyle = '#38bdf8';
+      }
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.roundRect(x - bw / 2, y - bh / 2, bw, bh, 4);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = theme === 'pink' ? '#ffe4e6' : (theme === 'yellow' ? '#fef08a' : '#e0f2fe');
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text, x, y + 0.5);
+      ctx.restore();
+    }
+
+    function draw3DDimensions(basis, w, h, prof) {
+      const W = params.width;
+      const zF = params.thickness;
+
+      // 1. Total Length: 550 mm (Top/Bottom)
+      drawDimLine3D(
+        basis, w, h,
+        { x: 0, y: -42, z: 0 },
+        { x: W, y: -42, z: 0 },
+        { x: 0, y: 0, z: 0 },
+        { x: W, y: 0, z: 0 },
+        '550 mm', 'pink'
+      );
+
+      // 2. Total Web Height: 200 mm (Left)
+      drawDimLine3D(
+        basis, w, h,
+        { x: -65, y: 0, z: 0 },
+        { x: -65, y: 200, z: 0 },
+        { x: 0, y: 0, z: 0 },
+        { x: 0, y: 200, z: 0 },
+        '200 mm', 'pink'
+      );
+
+      // 3. Left Hole Spacing: 136 mm
+      drawDimLine3D(
+        basis, w, h,
+        { x: -28, y: 100 - params.hole8Spacing / 2, z: zF },
+        { x: -28, y: 100 + params.hole8Spacing / 2, z: zF },
+        { x: params.hole8X, y: 100 - params.hole8Spacing / 2, z: zF },
+        { x: params.hole8X, y: 100 + params.hole8Spacing / 2, z: zF },
+        '136 mm', 'blue'
+      );
+
+      // 4. Left Axis Distance: 100
+      drawDimLine3D(
+        basis, w, h,
+        { x: 0, y: -18, z: zF },
+        { x: params.hole8X, y: -18, z: zF },
+        { x: 0, y: 0, z: zF },
+        { x: params.hole8X, y: 0, z: zF },
+        '100', 'yellow'
+      );
+
+      // 5. Right Axis Distance: 100 (from right edge)
+      drawDimLine3D(
+        basis, w, h,
+        { x: params.buzzerAxisX, y: -18, z: zF },
+        { x: W, y: -18, z: zF },
+        { x: params.buzzerAxisX, y: 0, z: zF },
+        { x: W, y: 0, z: zF },
+        '100', 'yellow'
+      );
+
+      // 6. Buzzer Holes Spacing: 100 (2x Ø7)
+      drawDimLine3D(
+        basis, w, h,
+        { x: params.buzzerAxisX - params.hole7Spacing / 2, y: params.hole7Y + 25, z: zF + 4 },
+        { x: params.buzzerAxisX + params.hole7Spacing / 2, y: params.hole7Y + 25, z: zF + 4 },
+        { x: params.buzzerAxisX - params.hole7Spacing / 2, y: params.hole7Y, z: zF },
+        { x: params.buzzerAxisX + params.hole7Spacing / 2, y: params.hole7Y, z: zF },
+        '100', 'yellow'
+      );
+
+      // 7. Sloped Canopy Length: 200 mm & 10° (on Right Side Profile X = W)
+      const offY = 22, offZ = 10;
+      drawDimLine3D(
+        basis, w, h,
+        { x: W + 20, y: prof.out1.y + offY, z: prof.out1.z + offZ },
+        { x: W + 20, y: prof.out2.y + offY, z: prof.out2.z + offZ },
+        { x: W, y: prof.out1.y, z: prof.out1.z },
+        { x: W, y: prof.out2.y, z: prof.out2.z },
+        `200 (${params.slopeDeg}°)`, 'pink'
+      );
+
+      // 8. Front Return Lip: 20 mm
+      drawDimLine3D(
+        basis, w, h,
+        { x: W + 20, y: prof.out2.y, z: prof.out2.z + 24 },
+        { x: W + 20, y: prof.out3.y, z: prof.out3.z + 24 },
+        { x: W, y: prof.out2.y, z: prof.out2.z },
+        { x: W, y: prof.out3.y, z: prof.out3.z },
+        '20', 'pink'
+      );
+
+      // 9. Hole Diameter Callout Leaders (2x Ø8 and 2x Ø7) & ép 3,5
+      const pH8 = project3D({ x: params.hole8X, y: 100 - params.hole8Spacing / 2, z: zF }, basis, w, h);
+      const pH8Lbl = project3D({ x: 185, y: -42, z: zF }, basis, w, h);
+      if (pH8 && pH8Lbl) {
+        ctx.save();
+        ctx.strokeStyle = '#facc15';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(pH8.x, pH8.y);
+        ctx.lineTo(pH8Lbl.x, pH8Lbl.y);
+        ctx.stroke();
+        drawLabelBadge(pH8Lbl.x, pH8Lbl.y, '2× Ø8', 'yellow');
+        ctx.restore();
+      }
+
+      const pH7 = project3D({ x: params.buzzerAxisX + params.hole7Spacing / 2, y: params.hole7Y, z: zF }, basis, w, h);
+      const pH7Lbl = project3D({ x: params.buzzerAxisX + 10, y: -42, z: zF }, basis, w, h);
+      if (pH7 && pH7Lbl) {
+        ctx.save();
+        ctx.strokeStyle = '#facc15';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(pH7.x, pH7.y);
+        ctx.lineTo(pH7Lbl.x, pH7Lbl.y);
+        ctx.stroke();
+        drawLabelBadge(pH7Lbl.x, pH7Lbl.y, '2× Ø7', 'yellow');
+        ctx.restore();
+      }
+
+      // Thickness callout ép 3,5
+      const pEp = project3D({ x: W, y: 0, z: zF / 2 }, basis, w, h);
+      if (pEp) {
+        drawLabelBadge(pEp.x + 38, pEp.y + 18, 'ép 3,5', 'pink');
+      }
+
+      // Component titles if equipment is shown
+      if (params.showEquip) {
+        const pBS = project3D({ x: params.hole8X, y: 118, z: zF + 30 }, basis, w, h);
+        if (pBS) drawLabelBadge(pBS.x, pBS.y, '35000', 'blue');
+
+        const pBZ = project3D({ x: params.buzzerAxisX, y: 118, z: zF + 122 }, basis, w, h);
+        if (pBZ) drawLabelBadge(pBZ.x, pBZ.y, 'BUZZER', 'yellow');
+      }
+    }
+
+    function drawAxesGizmo(basis, cx, cy) {
+      const len = 30;
+      const axes = [
+        { label: 'X', vec: { x: 1, y: 0, z: 0 }, color: '#ef4444' },
+        { label: 'Y', vec: { x: 0, y: 1, z: 0 }, color: '#22c55e' },
+        { label: 'Z', vec: { x: 0, y: 0, z: 1 }, color: '#3b82f6' }
+      ];
+      ctx.save();
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
+      ctx.strokeStyle = 'rgba(148, 163, 184, 0.2)';
+      ctx.beginPath();
+      ctx.arc(cx, cy, 40, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      axes.forEach(ax => {
+        const sx = (ax.vec.x * basis.rx + ax.vec.y * basis.ry + ax.vec.z * basis.rz) * len;
+        const sy = -(ax.vec.x * basis.ux + ax.vec.y * basis.uy + ax.vec.z * basis.uz) * len;
+        ctx.beginPath();
+        ctx.strokeStyle = ax.color;
+        ctx.lineWidth = 2.2;
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(cx + sx, cy + sy);
+        ctx.stroke();
+
+        ctx.fillStyle = ax.color;
+        ctx.font = 'bold 12px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(ax.label, cx + sx * 1.25, cy + sy * 1.25);
+      });
+      ctx.restore();
+    }
+
+    // =========================================================================
+    // INTERACTIVE CONTROLS & CAMERA PRESETS
+    // =========================================================================
+    canvas.addEventListener('mousedown', e => {
+      isDragging = true;
+      dragMode = (e.button === 2 || e.shiftKey) ? 'pan' : 'orbit';
+      lastMouse = { x: e.clientX, y: e.clientY };
+    });
+    window.addEventListener('mouseup', () => { isDragging = false; });
+    canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+    window.addEventListener('mousemove', e => {
+      if (!isDragging) return;
+      const dx = e.clientX - lastMouse.x;
+      const dy = e.clientY - lastMouse.y;
+      lastMouse = { x: e.clientX, y: e.clientY };
+
+      if (dragMode === 'orbit') {
+        camera.yaw -= dx * 0.007;
+        camera.pitch = Math.max(-Math.PI / 2 + 0.05, Math.min(Math.PI / 2 - 0.05, camera.pitch + dy * 0.007));
+      } else {
+        const basis = getCameraBasis();
+        const panSpeed = camera.distance * 0.0012;
+        camera.target.x -= (basis.rx * dx - basis.ux * dy) * panSpeed;
+        camera.target.y -= (basis.ry * dx - basis.uy * dy) * panSpeed;
+        camera.target.z -= (basis.rz * dx - basis.uz * dy) * panSpeed;
+      }
+      render();
+    });
+
+    canvas.addEventListener('wheel', e => {
+      e.preventDefault();
+      const factor = e.deltaY > 0 ? 1.09 : 0.91;
+      camera.distance = Math.max(220, Math.min(2600, camera.distance * factor));
+      render();
+    }, { passive: false });
+
+    function setCameraPreset(preset) {
+      document.querySelectorAll('[id^="view-"]').forEach(btn => btn.classList.remove('active'));
+      const activeBtn = document.getElementById('view-' + preset);
+      if (activeBtn) activeBtn.classList.add('active');
+
+      if (preset === 'iso') {
+        animateFold(100);
+        params.ortho = false;
+        camera.yaw = -0.62;
+        camera.pitch = 0.42;
+        camera.distance = 920;
+        camera.target = { x: 275, y: 100, z: 75 };
+      } else if (preset === 'front') {
+        params.ortho = true;
+        camera.yaw = 0;
+        camera.pitch = 0;
+        camera.distance = 860;
+        camera.target = { x: 275, y: 100, z: 20 };
+      } else if (preset === 'right') {
+        animateFold(100);
+        params.ortho = true;
+        camera.yaw = -Math.PI / 2;
+        camera.pitch = 0;
+        camera.distance = 620;
+        camera.target = { x: 275, y: 100, z: 100 };
+      } else if (preset === 'top') {
+        params.ortho = true;
+        camera.yaw = 0;
+        camera.pitch = Math.PI / 2 - 0.001;
+        camera.distance = 880;
+        camera.target = { x: 275, y: 100, z: 95 };
+      } else if (preset === 'flat') {
+        animateFold(0);
+        params.ortho = true;
+        camera.yaw = 0;
+        camera.pitch = 0;
+        camera.distance = 950;
+        camera.target = { x: 275, y: 210, z: 0 };
+      }
+      syncToggleUI();
+      render();
+    }
+
+    function onFoldChange(val) {
+      params.foldProgress = parseFloat(val) / 100;
+      document.getElementById('foldLabel').textContent =
+        val == 0 ? '0% (Déplié)' : (val == 100 ? '100% (Plié)' : `${val}%`);
+      render();
+    }
+
+    function animateFold(targetPct) {
+      cancelAnimationFrame(animFrameId);
+      const slider = document.getElementById('foldSlider');
+      const startPct = parseFloat(slider.value);
+      const startTime = performance.now();
+      const duration = 450;
+
+      function step(now) {
+        const t = Math.min(1, (now - startTime) / duration);
+        const eased = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+        const curr = Math.round(startPct + (targetPct - startPct) * eased);
+        slider.value = curr;
+        onFoldChange(curr);
+        if (t < 1) animFrameId = requestAnimationFrame(step);
+      }
+      animFrameId = requestAnimationFrame(step);
+    }
+
+    function toggleOption(key) {
+      params[key] = !params[key];
+      syncToggleUI();
+      render();
+    }
+
+    function syncToggleUI() {
+      const map = {
+        showDims: 'toggle-dims',
+        showEquip: 'toggle-equip',
+        showCenterlines: 'toggle-axes',
+        wireframe: 'toggle-wire',
+        ortho: 'toggle-ortho',
+        xray: 'toggle-xray'
+      };
+      for (const [k, id] of Object.entries(map)) {
+        const el = document.getElementById(id);
+        if (!el) continue;
+        el.classList.toggle('active', !!params[k]);
+      }
+    }
+
+    function updateParam(key, val) {
+      params[key] = parseFloat(val);
+      if (key === 'slopeDeg') {
+        document.getElementById('val-angle').textContent = `${val}°`;
+      } else if (key === 'hole7Y') {
+        document.getElementById('val-y7').textContent = `${val} mm`;
+      }
+      render();
+    }
+
+    // =========================================================================
+    // BUILT-IN AUTOCAD DXF GENERATOR (Browser Download)
+    // =========================================================================
+    function downloadDXF() {
+      // Generates a clean multi-view + 3D + Flat Pattern DXF directly in browser
+      const lines = [];
+      const push = (code, val) => { lines.push(String(code), String(val)); };
+
+      push(0, 'SECTION'); push(2, 'HEADER');
+      push(9, '$ACADVER'); push(1, 'AC1032'); // AutoCAD 2018-2024
+      push(9, '$INSUNITS'); push(70, 4);      // 4 = Millimeters
+      push(0, 'ENDSEC');
+
+      push(0, 'SECTION'); push(2, 'ENTITIES');
+
+      const addLine = (x1, y1, x2, y2, layer) => {
+        push(0, 'LINE'); push(8, layer);
+        push(10, x1.toFixed(4)); push(20, y1.toFixed(4)); push(30, '0.0');
+        push(11, x2.toFixed(4)); push(21, y2.toFixed(4)); push(31, '0.0');
+      };
+      const addRect = (x, y, w, h, layer) => {
+        addLine(x, y, x + w, y, layer);
+        addLine(x + w, y, x + w, y + h, layer);
+        addLine(x + w, y + h, x, y + h, layer);
+        addLine(x, y + h, x, y, layer);
+      };
+      const addCircle = (cx, cy, r, layer) => {
+        push(0, 'CIRCLE'); push(8, layer);
+        push(10, cx.toFixed(4)); push(20, cy.toFixed(4)); push(30, '0.0');
+        push(40, r.toFixed(4));
+      };
+      const addText = (x, y, h, txt, layer) => {
+        push(0, 'TEXT'); push(8, layer);
+        push(10, x.toFixed(4)); push(20, y.toFixed(4)); push(30, '0.0');
+        push(40, h.toFixed(4)); push(1, txt);
+      };
+
+      const W = params.width;
+      const H = params.webHeight;
+
+      // 1. Front View at (0, 0)
+      addRect(0, 0, W, H, 'CONTOUR_INOX');
+      addCircle(params.hole8X, 100 + params.hole8Spacing / 2, params.hole8Dia / 2, 'PERCAGES');
+      addCircle(params.hole8X, 100 - params.hole8Spacing / 2, params.hole8Dia / 2, 'PERCAGES');
+      addCircle(params.buzzerAxisX - params.hole7Spacing / 2, params.hole7Y, params.hole7Dia / 2, 'PERCAGES');
+      addCircle(params.buzzerAxisX + params.hole7Spacing / 2, params.hole7Y, params.hole7Dia / 2, 'PERCAGES');
+      addLine(-20, 100, W + 20, 100, 'AXES');
+      addLine(params.hole8X, -20, params.hole8X, H + 20, 'AXES');
+      addLine(params.buzzerAxisX, -20, params.buzzerAxisX, H + 20, 'AXES');
+      addText(0, -35, 10, 'VUE DE FACE (550 x 200 mm - INOX 316L ep. 3.5 mm - Qt = 60 pcs)', 'TEXTE');
+
+      // 2. Flat Pattern (Laser Cut) at (0, -520)
+      const yFlat = -520;
+      const devLen = H + params.roofLen + params.lipLen;
+      addRect(0, yFlat, W, devLen, 'DEPLIE_LASER');
+      addLine(0, yFlat + H, W, yFlat + H, 'LIGNES_PLIAGE');
+      addLine(0, yFlat + H + params.roofLen, W, yFlat + H + params.roofLen, 'LIGNES_PLIAGE');
+      addCircle(params.hole8X, yFlat + 100 + params.hole8Spacing / 2, params.hole8Dia / 2, 'PERCAGES');
+      addCircle(params.hole8X, yFlat + 100 - params.hole8Spacing / 2, params.hole8Dia / 2, 'PERCAGES');
+      addCircle(params.buzzerAxisX - params.hole7Spacing / 2, yFlat + params.hole7Y, params.hole7Dia / 2, 'PERCAGES');
+      addCircle(params.buzzerAxisX + params.hole7Spacing / 2, yFlat + params.hole7Y, params.hole7Dia / 2, 'PERCAGES');
+      addText(0, yFlat - 35, 10, 'DEVELOPPE LASER (550 x 420 mm nominal / Plis a 200 et 400 mm)', 'TEXTE');
+
+      push(0, 'ENDSEC');
+      push(0, 'EOF');
+
+      const blob = new Blob([lines.join('\r\n')], { type: 'application/dxf' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'support_inox_316L_2024.dxf';
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    // Initialize
+    resizeCanvas();
+  </script>
+</body>
+</html>
