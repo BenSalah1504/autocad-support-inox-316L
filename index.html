@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>CAD 3D — Support 35000 & Buzzer (INOX 316L ép. 3,5 mm)</title>
+  <title>CAD 3D — Support Buzzer (INOX 304 ép. 4 mm)</title>
   <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
   <style>
     * { box-sizing: border-box; user-select: none; }
@@ -75,13 +75,13 @@
       <div>
         <div class="flex items-center gap-2">
           <h1 class="text-sm font-bold tracking-wide text-white uppercase">
-            Support 35000 &amp; Buzzer — Tôle Pliée
+            Support Buzzer — Tôle Pliée
           </h1>
           <span class="rounded px-2 py-0.5 text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-            INOX 316L
+            INOX 304
           </span>
           <span class="rounded px-2 py-0.5 text-xs font-semibold badge-pink">
-            ép. 3,5 mm
+            ép. 4 mm
           </span>
           <span class="rounded px-2 py-0.5 text-xs font-semibold bg-sky-500/20 text-sky-300 border border-sky-500/30">
             Qt = 60 pièces
@@ -143,7 +143,7 @@
             <span class="w-2 h-2 rounded-full bg-sky-400"></span>
           </button>
           <button id="toggle-equip" onclick="toggleOption('showEquip')" class="cad-btn active rounded px-2 py-1.5 text-left flex items-center justify-between">
-            <span>35000 &amp; Buzzer</span>
+            <span>Équipements &amp; Buzzer</span>
             <span class="w-2 h-2 rounded-full bg-amber-400"></span>
           </button>
           <button id="toggle-axes" onclick="toggleOption('showCenterlines')" class="cad-btn active rounded px-2 py-1.5 text-left flex items-center justify-between">
@@ -175,7 +175,7 @@
           </div>
           <div class="flex justify-between items-center bg-slate-900/70 px-2.5 py-1 rounded border border-slate-800">
             <span class="text-slate-400">Épaisseur matière</span>
-            <span class="font-mono font-semibold badge-pink px-1.5 rounded">ép. 3,5 mm</span>
+            <span class="font-mono font-semibold badge-pink px-1.5 rounded">ép. 4 mm</span>
           </div>
           <div class="flex justify-between items-center bg-slate-900/70 px-2.5 py-1 rounded border border-slate-800">
             <span class="text-slate-400">Auvent supérieur (pente)</span>
@@ -186,11 +186,11 @@
             <span class="font-mono font-semibold badge-pink px-1.5 rounded">20 mm</span>
           </div>
           <div class="flex justify-between items-center bg-slate-900/70 px-2.5 py-1 rounded border border-slate-800">
-            <span class="text-slate-400">Perçages 35000 (gauche)</span>
+            <span class="text-slate-400">Perçages gauche</span>
             <span class="font-mono font-semibold badge-yellow px-1.5 rounded">2× Ø8 (entr. 136)</span>
           </div>
           <div class="flex justify-between items-center bg-slate-900/70 px-2.5 py-1 rounded border border-slate-800">
-            <span class="text-slate-400">Position axe 35000</span>
+            <span class="text-slate-400">Position axe gauche</span>
             <span class="font-mono font-semibold badge-yellow px-1.5 rounded">100 mm du bord G</span>
           </div>
           <div class="flex justify-between items-center bg-slate-900/70 px-2.5 py-1 rounded border border-slate-800">
@@ -257,8 +257,8 @@
       webHeight: 200,      // 200 mm vertical backplate height
       roofLen: 200,        // 200 mm sloped hood length
       lipLen: 20,          // 20 mm front vertical return lip
-      thickness: 3.5,      // ép 3,5 mm INOX 316L
-      slopeDeg: 10,        // ~10° downward slope from horizontal
+      thickness: 4.0,      // ép 4 mm INOX 304
+      slopeDeg: 10,        // 10° downward slope from horizontal
       // Left holes (BS2000): 2x Ø8, center-to-center 136 mm, ~100 mm from left
       hole8X: 100,
       hole8Spacing: 136,
@@ -729,9 +729,9 @@
         // Horizontal rectangular arm/channel from BS2000 toward Buzzer
         addBoxWireAndGhost(params.hole8X + 52, 360, 70, 130, zMount, zMount + 16, { r: 56, g: 189, b: 248 }, '#38bdf8');
 
-        // --- BUZZER Housing (130 x 130 mm square, depth 120 mm as shown in Side View) ---
+        // --- BUZZER Housing (130 x 130 x 130 mm cube as shown in Side View) ---
         const bzHalf = 65;
-        const bzDepth = 120;
+        const bzDepth = 130;
         addBoxWireAndGhost(
           params.buzzerAxisX - bzHalf,
           params.buzzerAxisX + bzHalf,
@@ -742,7 +742,7 @@
           { r: 245, g: 158, b: 11 },
           '#fbbf24'
         );
-        // Dashed / circular horn outline on Buzzer (Ø120 outer, Ø80 inner)
+        // Dashed / circular horn outline on Buzzer (Ø120 outer, r=30 mm side circle)
         const hornSegs = 24;
         for (let i = 0; i < hornSegs; i++) {
           const j = (i + 1) % hornSegs;
@@ -756,10 +756,10 @@
             width: 1.2,
             dashed: true
           });
-          // Side view dashed circle (in YZ plane at X = buzzerAxisX + bzHalf)
+          // Side view dashed circle (in YZ plane at X = buzzerAxisX + bzHalf, radius = 30 mm)
           lines.push({
-            a: { x: params.buzzerAxisX + bzHalf, y: 100 + Math.sin(a1) * 38, z: zMount + bzDepth * 0.5 + Math.cos(a1) * 38 },
-            b: { x: params.buzzerAxisX + bzHalf, y: 100 + Math.sin(a2) * 38, z: zMount + bzDepth * 0.5 + Math.cos(a2) * 38 },
+            a: { x: params.buzzerAxisX + bzHalf, y: 100 + Math.sin(a1) * 30, z: zMount + bzDepth * 0.5 + Math.cos(a1) * 30 },
+            b: { x: params.buzzerAxisX + bzHalf, y: 100 + Math.sin(a2) * 30, z: zMount + bzDepth * 0.5 + Math.cos(a2) * 30 },
             color: '#fcd34d',
             width: 1.2,
             dashed: true
@@ -1136,18 +1136,15 @@
         ctx.restore();
       }
 
-      // Thickness callout ép 3,5
+      // Thickness callout ép 4
       const pEp = project3D({ x: W, y: 0, z: zF / 2 }, basis, w, h);
       if (pEp) {
-        drawLabelBadge(pEp.x + 38, pEp.y + 18, 'ép 3,5', 'pink');
+        drawLabelBadge(pEp.x + 38, pEp.y + 18, 'ép 4', 'pink');
       }
 
       // Component titles if equipment is shown
       if (params.showEquip) {
-        const pBS = project3D({ x: params.hole8X, y: 118, z: zF + 30 }, basis, w, h);
-        if (pBS) drawLabelBadge(pBS.x, pBS.y, '35000', 'blue');
-
-        const pBZ = project3D({ x: params.buzzerAxisX, y: 118, z: zF + 122 }, basis, w, h);
+        const pBZ = project3D({ x: params.buzzerAxisX, y: 118, z: zF + 132 }, basis, w, h);
         if (pBZ) drawLabelBadge(pBZ.x, pBZ.y, 'BUZZER', 'yellow');
       }
     }
